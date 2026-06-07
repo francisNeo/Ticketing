@@ -1,0 +1,608 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum EventVisibility {
+  public
+  private
+}
+
+enum EventStatus {
+  draft
+  published
+  cancelled
+  completed
+}
+
+enum LocationType {
+  physical
+  virtual
+}
+
+enum RegistrationStatus {
+  pending
+  confirmed
+  cancelled
+  checked_in
+}
+
+enum PaymentMethod {
+  card
+  mpesa
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum NotificationChannel {
+  sms
+  email
+  both
+}
+
+enum BundleChannel {
+  sms
+  email
+}
+
+enum BundlePurchaseStatus {
+  pending
+  completed
+  failed
+}
+
+enum NotificationSendStatus {
+  queued
+  sending
+  completed
+  partial_failure
+}
+
+enum BundleRefundTrigger {
+  event_completed
+  event_cancelled
+  admin_cancelled
+  organiser_request
+}
+
+enum BundleRefundStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum BillingCycle {
+  monthly
+  annual
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  past_due
+  expired
+}
+
+enum FieldType {
+  text
+  textarea
+  dropdown
+  checkbox
+  date
+}
+
+enum OtpAttemptStatus {
+  pending
+  verified
+  expired
+  locked
+}
+
+// ─── Users & Auth ────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String   @db.VarChar(255)
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String?  @map("password_hash") @db.Text
+  emailVerified Boolean  @default(false) @map("email_verified")
+  avatarUrl     String?  @map("avatar_url") @db.Text
+  refreshToken  String?  @map("refresh_token") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  userRoles            UserRole[]             @relation("UserToRoles")
+  assignedRoles        UserRole[]             @relation("AssignedByUser")
+  ownedEvents          Event[]                @relation("EventOrganiser")
+  coOrganisedEvents    EventCoOrganiser[]     @relation("CoOrganiser")
+  invitedCoOrganisers  EventCoOrganiser[]     @relation("InvitedByOrganiser")
+  registrations        Registration[]
+  bundleBalance        OrganiserBundleBalance?
+  bundlePurchases      BundlePurchase[]
+  bundleRefunds        BundleRefund[]
+  notificationSends    NotificationSend[]
+  subscription         OrganiserSubscription?
+  eventPlanPurchases   EventPlanPurchase[]
+  commissionOverrides  CommissionOverride[]   @relation("OverrideOrganiser")
+  overridesSet         CommissionOverride[]   @relation("OverrideSetBy")
+  rolesCreated         Role[]
+  grantedPermissions   RolePermission[]
+  churchConfigs        ChurchEventConfig[]    @relation("ChurchConfigCreator")
+
+  @@map("users")
+}
+
+// ─── RBAC ────────────────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  displayName String   @map("display_name") @db.VarChar(255)
+  description String?  @db.Text
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator     User?          @relation(fields: [createdBy], references: [id])
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String @unique @db.VarChar(100)
+  group       String @db.VarChar(100)
+  description String? @db.Text
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  grantedBy    String?  @map("granted_by") @db.Uuid
+  grantedAt    DateTime @default(now()) @map("granted_at") @db.Timestamptz
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granter    User?      @relation(fields: [grantedBy], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId     String    @map("user_id") @db.Uuid
+  roleId     String    @map("role_id") @db.Uuid
+  assignedBy String?   @map("assigned_by") @db.Uuid
+  assignedAt DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz
+
+  user     User  @relation("UserToRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role     Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assigner User? @relation("AssignedByUser", fields: [assignedBy], references: [id])
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+model Event {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organiserId         String          @map("organiser_id") @db.Uuid
+  title               String          @db.VarChar(255)
+  slug                String?         @unique @db.VarChar(255)
+  privateToken        String?         @unique @map("private_token") @db.Uuid
+  description         String?         @db.Text
+  bannerUrl           String?         @map("banner_url") @db.Text
+  visibility          EventVisibility
+  status              EventStatus     @default(draft)
+  startsAt            DateTime        @map("starts_at") @db.Timestamptz
+  endsAt              DateTime?       @map("ends_at") @db.Timestamptz
+  locationType        LocationType    @map("location_type")
+  locationText        String?         @map("location_text") @db.Text
+  isFree              Boolean         @default(true) @map("is_free")
+  currency            String          @default("KES") @db.Char(3)
+  maxCapacity         Int?            @map("max_capacity")
+  registrationDeadline DateTime?      @map("registration_deadline") @db.Timestamptz
+  category            String?         @db.VarChar(100)
+  tags                String[]
+  minAge              Int?            @map("min_age")
+  maxAge              Int?            @map("max_age")
+  recurrenceGroupId   String?         @map("recurrence_group_id") @db.Uuid
+  recurrenceRule      String?         @map("recurrence_rule") @db.Text
+  // Church / Religious event fields
+  serviceType         String?         @map("service_type") @db.VarChar(100)
+  ministry            String?         @db.VarChar(255)
+  denomination        String?         @db.VarChar(100)
+  dressCode           String?         @map("dress_code") @db.VarChar(100)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser           User                  @relation("EventOrganiser", fields: [organiserId], references: [id])
+  ticketTypes         TicketType[]
+  registrations       Registration[]
+  coOrganisers        EventCoOrganiser[]
+  sponsors            EventSponsor[]
+  customQuestions     EventCustomQuestion[]
+  notificationSends   NotificationSend[]
+  eventPlanPurchase   EventPlanPurchase?
+  commissionOverride  CommissionOverride?   @relation("EventOverride")
+  phoneOtps           PhoneOtp[]
+  bundleRefunds       BundleRefund[]
+
+  @@map("events")
+}
+
+model EventCoOrganiser {
+  eventId          String   @map("event_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  canViewFinancials Boolean  @default(false) @map("can_view_financials")
+  invitedBy        String?  @map("invited_by") @db.Uuid
+  invitedAt        DateTime @default(now()) @map("invited_at") @db.Timestamptz
+
+  event   Event @relation(fields: [eventId], references: [id])
+  user    User  @relation("CoOrganiser", fields: [userId], references: [id])
+  inviter User? @relation("InvitedByOrganiser", fields: [invitedBy], references: [id])
+
+  @@id([eventId, userId])
+  @@map("event_co_organisers")
+}
+
+model EventSponsor {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId      String  @map("event_id") @db.Uuid
+  name         String  @db.VarChar(255)
+  logoUrl      String? @map("logo_url") @db.Text
+  websiteUrl   String? @map("website_url") @db.Text
+  displayOrder Int     @default(0) @map("display_order")
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@map("event_sponsors")
+}
+
+model EventCustomQuestion {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId      String    @map("event_id") @db.Uuid
+  label        String    @db.VarChar(500)
+  fieldType    FieldType @map("field_type")
+  options      Json?
+  isRequired   Boolean   @default(false) @map("is_required")
+  displayOrder Int       @default(0) @map("display_order")
+
+  event   Event                @relation(fields: [eventId], references: [id])
+  answers RegistrationAnswer[]
+
+  @@map("event_custom_questions")
+}
+
+// ─── OTP ─────────────────────────────────────────────────────────────────────
+
+model PhoneOtp {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone     String   @db.VarChar(20)
+  eventId   String   @map("event_id") @db.Uuid
+  codeHash  String   @map("code_hash") @db.Text
+  attempts  Int      @default(0)
+  verified  Boolean  @default(false)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@unique([phone, eventId])
+  @@map("phone_otps")
+}
+
+// ─── Tickets & Registrations ─────────────────────────────────────────────────
+
+model TicketType {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId     String    @map("event_id") @db.Uuid
+  name        String    @db.VarChar(100)
+  price       Decimal   @db.Decimal(10, 2)
+  quantity    Int?
+  soldCount   Int       @default(0) @map("sold_count")
+  isNamed     Boolean   @default(false) @map("is_named")
+  description String?   @db.Text
+  saleEndsAt  DateTime? @map("sale_ends_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  event         Event          @relation(fields: [eventId], references: [id])
+  registrations Registration[]
+
+  @@map("ticket_types")
+}
+
+model Registration {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId        String             @map("event_id") @db.Uuid
+  ticketTypeId   String             @map("ticket_type_id") @db.Uuid
+  attendeeId     String?            @map("attendee_id") @db.Uuid
+  attendeeName   String             @map("attendee_name") @db.VarChar(255)
+  attendeeEmail  String             @map("attendee_email") @db.VarChar(255)
+  attendeePhone  String             @map("attendee_phone") @db.VarChar(20)
+  quantity       Int                @default(1)
+  attendeeNames  String[]           @map("attendee_names")
+  status         RegistrationStatus @default(pending)
+  qrCode         String?            @map("qr_code") @db.Text
+  checkedInAt    DateTime?          @map("checked_in_at") @db.Timestamptz
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  event      Event               @relation(fields: [eventId], references: [id])
+  ticketType TicketType          @relation(fields: [ticketTypeId], references: [id])
+  attendee   User?               @relation(fields: [attendeeId], references: [id])
+  payment    Payment?
+  answers    RegistrationAnswer[]
+
+  @@map("registrations")
+}
+
+model RegistrationAnswer {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registrationId String @map("registration_id") @db.Uuid
+  questionId     String @map("question_id") @db.Uuid
+  answer         String @db.Text
+
+  registration Registration        @relation(fields: [registrationId], references: [id])
+  question     EventCustomQuestion @relation(fields: [questionId], references: [id])
+
+  @@map("registration_answers")
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registrationId          String        @unique @map("registration_id") @db.Uuid
+  method                  PaymentMethod
+  amount                  Decimal       @db.Decimal(10, 2)
+  currency                String        @default("KES") @db.Char(3)
+  status                  PaymentStatus @default(pending)
+  stripePaymentIntentId   String?       @map("stripe_payment_intent_id") @db.Text
+  mpesaCheckoutRequestId  String?       @map("mpesa_checkout_request_id") @db.Text
+  mpesaReceiptNumber      String?       @map("mpesa_receipt_number") @db.Text
+  mpesaPhone              String?       @map("mpesa_phone") @db.VarChar(20)
+  stripeRefundId          String?       @map("stripe_refund_id") @db.Text
+  paidAt                  DateTime?     @map("paid_at") @db.Timestamptz
+  refundedAt              DateTime?     @map("refunded_at") @db.Timestamptz
+  createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  registration Registration @relation(fields: [registrationId], references: [id])
+
+  @@map("payments")
+}
+
+// ─── Notification Bundles ────────────────────────────────────────────────────
+
+model NotificationBundle {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String        @db.VarChar(255)
+  channel      BundleChannel
+  units        Int
+  price        Decimal       @db.Decimal(10, 2)
+  isActive     Boolean       @default(true) @map("is_active")
+  displayOrder Int           @default(0) @map("display_order")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  purchases BundlePurchase[]
+
+  @@map("notification_bundles")
+}
+
+model OrganiserBundleBalance {
+  organiserId         String   @id @map("organiser_id") @db.Uuid
+  smsUnits            Int      @default(0) @map("sms_units")
+  emailUnits          Int      @default(0) @map("email_units")
+  totalSmsPurchased   Int      @default(0) @map("total_sms_purchased")
+  totalEmailPurchased Int      @default(0) @map("total_email_purchased")
+  totalSmsConsumed    Int      @default(0) @map("total_sms_consumed")
+  totalEmailConsumed  Int      @default(0) @map("total_email_consumed")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser User @relation(fields: [organiserId], references: [id])
+
+  @@map("organiser_bundle_balance")
+}
+
+model BundlePurchase {
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organiserId           String               @map("organiser_id") @db.Uuid
+  bundleId              String               @map("bundle_id") @db.Uuid
+  unitsPurchased        Int                  @map("units_purchased")
+  amountPaid            Decimal              @map("amount_paid") @db.Decimal(10, 2)
+  paymentMethod         PaymentMethod        @map("payment_method")
+  paymentStatus         BundlePurchaseStatus @default(pending) @map("payment_status")
+  stripePaymentIntentId String?              @map("stripe_payment_intent_id") @db.Text
+  mpesaReceiptNumber    String?              @map("mpesa_receipt_number") @db.Text
+  purchasedAt           DateTime?            @map("purchased_at") @db.Timestamptz
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser User               @relation(fields: [organiserId], references: [id])
+  bundle    NotificationBundle @relation(fields: [bundleId], references: [id])
+  refunds   BundleRefund[]
+
+  @@map("bundle_purchases")
+}
+
+model BundleRefund {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organiserId             String              @map("organiser_id") @db.Uuid
+  purchaseId              String              @map("purchase_id") @db.Uuid
+  eventId                 String?             @map("event_id") @db.Uuid
+  trigger                 BundleRefundTrigger
+  channel                 BundleChannel
+  unitsRefunded           Int                 @map("units_refunded")
+  amountRefunded          Decimal             @map("amount_refunded") @db.Decimal(10, 2)
+  paymentMethod           PaymentMethod       @map("payment_method")
+  status                  BundleRefundStatus  @default(pending)
+  stripeRefundId          String?             @map("stripe_refund_id") @db.Text
+  mpesaB2cConversationId  String?             @map("mpesa_b2c_conversation_id") @db.Text
+  mpesaReceiptNumber      String?             @map("mpesa_receipt_number") @db.Text
+  initiatedAt             DateTime            @default(now()) @map("initiated_at") @db.Timestamptz
+  completedAt             DateTime?           @map("completed_at") @db.Timestamptz
+  failureReason           String?             @map("failure_reason") @db.Text
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser User           @relation(fields: [organiserId], references: [id])
+  purchase  BundlePurchase @relation(fields: [purchaseId], references: [id])
+  event     Event?         @relation(fields: [eventId], references: [id])
+
+  @@map("bundle_refunds")
+}
+
+model NotificationSend {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId        String                 @map("event_id") @db.Uuid
+  organiserId    String                 @map("organiser_id") @db.Uuid
+  channel        NotificationChannel
+  message        String                 @db.Text
+  recipientCount Int                    @map("recipient_count")
+  unitsDeducted  Int                    @map("units_deducted")
+  deliveredCount Int                    @default(0) @map("delivered_count")
+  failedCount    Int                    @default(0) @map("failed_count")
+  status         NotificationSendStatus @default(queued)
+  sentAt         DateTime?              @map("sent_at") @db.Timestamptz
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+
+  event     Event @relation(fields: [eventId], references: [id])
+  organiser User  @relation(fields: [organiserId], references: [id])
+
+  @@map("notification_sends")
+}
+
+// ─── Plans & Commission ──────────────────────────────────────────────────────
+
+model Plan {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String   @unique @db.VarChar(100)
+  displayName         String   @map("display_name") @db.VarChar(255)
+  monthlyPrice        Decimal  @map("monthly_price") @db.Decimal(10, 2)
+  annualPrice         Decimal? @map("annual_price") @db.Decimal(10, 2)
+  maxAttendeesPerEvent Int?    @map("max_attendees_per_event")
+  maxActiveEvents     Int?     @map("max_active_events")
+  commissionRate      Decimal  @map("commission_rate") @db.Decimal(5, 4)
+  maxCustomQuestions  Int      @default(0) @map("max_custom_questions")
+  maxCoOrganisers     Int      @default(0) @map("max_co_organisers")
+  canPurchaseBundles  Boolean  @default(false) @map("can_purchase_bundles")
+  hasAnalytics        Boolean  @default(false) @map("has_analytics")
+  canRecurring        Boolean  @default(false) @map("can_recurring")
+  removeBranding      Boolean  @default(false) @map("remove_branding")
+  hasCustomDomain     Boolean  @default(false) @map("has_custom_domain")
+  hasApiAccess        Boolean  @default(false) @map("has_api_access")
+  isActive            Boolean  @default(true) @map("is_active")
+  isPayPerEvent       Boolean  @default(false) @map("is_pay_per_event")
+  payPerEventFee      Decimal? @map("pay_per_event_fee") @db.Decimal(10, 2)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  subscriptions      OrganiserSubscription[]
+  eventPlanPurchases EventPlanPurchase[]
+
+  @@map("plans")
+}
+
+model OrganiserSubscription {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organiserId         String             @unique @map("organiser_id") @db.Uuid
+  planId              String             @map("plan_id") @db.Uuid
+  billingCycle        BillingCycle       @map("billing_cycle")
+  status              SubscriptionStatus @default(active)
+  currentPeriodStart  DateTime           @map("current_period_start") @db.Timestamptz
+  currentPeriodEnd    DateTime           @map("current_period_end") @db.Timestamptz
+  stripeSubscriptionId String?           @map("stripe_subscription_id") @db.Text
+  cancelledAt         DateTime?          @map("cancelled_at") @db.Timestamptz
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser User @relation(fields: [organiserId], references: [id])
+  plan      Plan @relation(fields: [planId], references: [id])
+
+  @@map("organiser_subscriptions")
+}
+
+model EventPlanPurchase {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organiserId           String        @map("organiser_id") @db.Uuid
+  eventId               String        @unique @map("event_id") @db.Uuid
+  planId                String        @map("plan_id") @db.Uuid
+  feePaid               Decimal       @map("fee_paid") @db.Decimal(10, 2)
+  commissionRate        Decimal       @map("commission_rate") @db.Decimal(5, 4)
+  paymentMethod         PaymentMethod @map("payment_method")
+  paymentStatus         BundlePurchaseStatus @default(pending) @map("payment_status")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id") @db.Text
+  mpesaReceiptNumber    String?       @map("mpesa_receipt_number") @db.Text
+  purchasedAt           DateTime?     @map("purchased_at") @db.Timestamptz
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser User  @relation(fields: [organiserId], references: [id])
+  event     Event @relation(fields: [eventId], references: [id])
+  plan      Plan  @relation(fields: [planId], references: [id])
+
+  @@map("event_plan_purchases")
+}
+
+// ─── Church Event Configuration (admin-managed) ──────────────────────────────
+
+model ChurchEventConfig {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind         String   @db.VarChar(50)   // 'service_type' | 'denomination' | 'dress_code'
+  value        String   @db.VarChar(255)
+  displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdBy    String?  @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator User? @relation("ChurchConfigCreator", fields: [createdBy], references: [id])
+
+  @@unique([kind, value])
+  @@map("church_event_configs")
+}
+
+model CommissionOverride {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organiserId    String?   @map("organiser_id") @db.Uuid
+  eventId        String?   @unique @map("event_id") @db.Uuid
+  commissionRate Decimal   @map("commission_rate") @db.Decimal(5, 4)
+  reason         String?   @db.Text
+  setBy          String    @map("set_by") @db.Uuid
+  validFrom      DateTime  @default(now()) @map("valid_from") @db.Timestamptz
+  validUntil     DateTime? @map("valid_until") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  organiser User?  @relation("OverrideOrganiser", fields: [organiserId], references: [id])
+  event     Event? @relation("EventOverride", fields: [eventId], references: [id])
+  setter    User   @relation("OverrideSetBy", fields: [setBy], references: [id])
+
+  @@map("commission_overrides")
+}
