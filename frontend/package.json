@@ -18,6 +18,7 @@
     "react-barcode": "^1.6.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.24.1",
+    "serve": "^14.2.6",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
