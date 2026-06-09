@@ -15,7 +15,7 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(form.email, form.password);
-      const roleNames = (user.roles || []).map((r) => (typeof r === 'string' ? r : r?.name));
+      const roleNames = ((user?.roles) || []).map((r) => (typeof r === 'string' ? r : r?.name));
       navigate(roleNames.includes('organiser') || roleNames.includes('admin') ? '/dashboard' : '/');
     } catch (err) {
       setError(err.message);

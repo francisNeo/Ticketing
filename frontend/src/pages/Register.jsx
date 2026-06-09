@@ -16,7 +16,7 @@ export default function Register() {
     setLoading(true);
     try {
       const user = await register(form.name, form.email, form.password, form.role);
-      const roleNames = (user.roles || []).map((r) => (typeof r === 'string' ? r : r?.name));
+      const roleNames = ((user?.roles) || []).map((r) => (typeof r === 'string' ? r : r?.name));
       navigate(roleNames.includes('organiser') ? '/dashboard' : '/');
     } catch (err) {
       setError(err.message);
