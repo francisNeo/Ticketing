@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getErrorMessage } from '../utils/errors';
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -30,6 +31,8 @@ api.interceptors.response.use(
         }
       }
     }
+    // Normalise the error so every catch block gets a clean `.message`
+    err.message = getErrorMessage(err);
     return Promise.reject(err);
   }
 );

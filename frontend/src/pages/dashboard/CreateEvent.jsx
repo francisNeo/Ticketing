@@ -83,7 +83,7 @@ export default function CreateEvent() {
         ...form,
         tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
         maxCapacity: form.maxCapacity ? parseInt(form.maxCapacity) : undefined,
-        isFree: form.isFree || ticketTypes.every((t) => Number(t.price) === 0),
+        isFree: form.isFree === true,
         captchaToken,
         serviceType: form.serviceType || undefined,
         ministry: form.ministry || undefined,
@@ -108,7 +108,7 @@ export default function CreateEvent() {
       setPublishedEvent(published);
       setStep(4);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create event');
+      setError(err.message);
     } finally {
       setLoading(false);
     }

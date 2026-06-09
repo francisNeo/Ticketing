@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { eventsApi, registrationsApi } from '../../api/client';
+import { getErrorMessage } from '../../utils/errors';
 
 export default function Attendees() {
   const { id } = useParams();
@@ -17,7 +18,7 @@ export default function Attendees() {
       await registrationsApi.checkin(regId);
       setRegistrations((prev) => prev.map((r) => r.id === regId ? { ...r, status: 'checked_in', checkedInAt: new Date().toISOString() } : r));
     } catch (err) {
-      alert(err.response?.data?.error || 'Check-in failed');
+      alert(getErrorMessage(err, 'Check-in failed'));
     }
   };
 

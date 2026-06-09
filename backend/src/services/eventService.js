@@ -84,7 +84,7 @@ async function createEvent(organiserId, data) {
       endsAt: data.endsAt ? new Date(data.endsAt) : null,
       locationType: data.locationType,
       locationText: data.locationText,
-      isFree: isFree !== false,
+      isFree: isFree === true,
       currency: data.currency || 'KES',
       maxCapacity: data.maxCapacity || null,
       registrationDeadline: data.registrationDeadline ? new Date(data.registrationDeadline) : null,

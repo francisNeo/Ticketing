@@ -41,7 +41,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const hasRole = (role) => user?.roles?.includes(role);
+  const hasRole = (role) => {
+    if (!user?.roles) return false;
+    return user.roles.some((r) => (typeof r === 'string' ? r : r?.name) === role);
+  };
   const isAdmin = () => hasRole('admin');
   const isOrganiser = () => hasRole('organiser') || hasRole('admin');
 

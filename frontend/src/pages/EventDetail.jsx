@@ -74,17 +74,34 @@ export default function EventDetail() {
     }
     setBusy(true);
     try {
-      const { data } = await otpApi.autoVerify({ phone: form.phone, eventId: event.id });
-      navigate(`/e/${slugOrToken}/checkout`, {
-        state: {
-          form,
-          attendeeNames: isNamed ? attendeeNames : [],
-          verifiedToken: data.verifiedToken,
+      const { data: tokenData } = await otpApi.autoVerify({ phone: form.phone, eventId: event.id });
+
+      if (event.isFree) {
+        // Free event — register immediately, skip checkout
+        const { data: reg } = await registrationsApi.create({
           eventId: event.id,
-        },
-      });
+          ticketTypeId: form.ticketTypeId,
+          quantity: form.quantity,
+          attendeeName: form.name,
+          attendeeEmail: form.email,
+          attendeePhone: form.phone,
+          attendeeNames: isNamed ? attendeeNames : [],
+          verifiedToken: tokenData.verifiedToken,
+        });
+        navigate(`/tickets/${reg.registration.id}`, { state: { confirmed: true } });
+      } else {
+        // Paid event — go to checkout
+        navigate(`/e/${slugOrToken}/checkout`, {
+          state: {
+            form,
+            attendeeNames: isNamed ? attendeeNames : [],
+            verifiedToken: tokenData.verifiedToken,
+            eventId: event.id,
+          },
+        });
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -127,9 +144,9 @@ export default function EventDetail() {
       const { data } = await registrationsApi.bulkRegister(event.id, fd);
       setBulkResult(data);
     } catch (err) {
-      const d = err.response?.data;
-      setBulkError(d?.error || 'Upload failed');
-      if (d?.errors?.length) setBulkPreview(d.errors.map((e) => ({ error: e })));
+      setBulkError(err.message);
+      const errors = err.response?.data?.errors;
+      if (Array.isArray(errors) && errors.length) setBulkPreview(errors.map((e) => ({ error: e })));
     } finally {
       setBulkUploading(false);
     }

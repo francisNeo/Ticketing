@@ -26,8 +26,16 @@ export default function Checkout() {
       attendeeNames: state.attendeeNames || [],
       verifiedToken: state.verifiedToken,
     })
-      .then(({ data }) => { setRegistration(data.registration); setStatus('idle'); })
-      .catch((err) => { setError(err.response?.data?.error || 'Failed to create registration'); setStatus('error'); });
+      .then(({ data }) => {
+        if (!data.requiresPayment) {
+          // Free event — go straight to the ticket
+          navigate(`/tickets/${data.registration.id}`, { state: { confirmed: true } });
+        } else {
+          setRegistration(data.registration);
+          setStatus('idle');
+        }
+      })
+      .catch((err) => { setError(err.message); setStatus('error'); });
   }, []);
 
   const pollStatus = (registrationId) => {
@@ -62,7 +70,7 @@ export default function Checkout() {
       setMessage('Check your phone — enter your M-PESA PIN to complete payment.');
       pollStatus(registration.id);
     } catch (err) {
-      setError(err.response?.data?.error || 'M-PESA initiation failed');
+      setError(err.message);
       setStatus('idle');
     }
   };

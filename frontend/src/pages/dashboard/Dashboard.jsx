@@ -11,7 +11,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     eventsApi.myEvents()
-      .then(({ data }) => setEvents(data))
+      .then(({ data }) => setEvents(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

@@ -27,7 +27,7 @@ const createEventSchema = z.object({
   locationType: z.enum(['physical', 'virtual']),
   locationText: z.string().optional(),
   visibility: z.enum(['public', 'private']),
-  isFree: z.boolean().default(true),
+  isFree: z.boolean().default(false),
   currency: z.string().length(3).default('KES'),
   maxCapacity: z.number().int().positive().optional(),
   registrationDeadline: flexDatetimeOptional,
