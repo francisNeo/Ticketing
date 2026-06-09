@@ -32,7 +32,7 @@ export default function Home() {
   useEffect(() => {
     setLoading(true);
     eventsApi.list({ page, category: category || undefined, search: search || undefined })
-      .then(({ data }) => { setEvents(data.events); setTotal(data.total); })
+      .then(({ data }) => { setEvents(Array.isArray(data?.events) ? data.events : []); setTotal(data?.total || 0); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [page, category, search]);
