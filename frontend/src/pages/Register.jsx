@@ -16,9 +16,10 @@ export default function Register() {
     setLoading(true);
     try {
       const user = await register(form.name, form.email, form.password, form.role);
-      navigate(user.roles?.includes('organiser') ? '/dashboard' : '/');
+      const roleNames = (user.roles || []).map((r) => (typeof r === 'string' ? r : r?.name));
+      navigate(roleNames.includes('organiser') ? '/dashboard' : '/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.message);
     } finally {
       setLoading(false);
     }

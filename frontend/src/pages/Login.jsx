@@ -15,9 +15,10 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(form.email, form.password);
-      navigate(user.roles?.includes('organiser') || user.roles?.includes('admin') ? '/dashboard' : '/');
+      const roleNames = (user.roles || []).map((r) => (typeof r === 'string' ? r : r?.name));
+      navigate(roleNames.includes('organiser') || roleNames.includes('admin') ? '/dashboard' : '/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
