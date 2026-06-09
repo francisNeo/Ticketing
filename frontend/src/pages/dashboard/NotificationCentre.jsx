@@ -14,7 +14,7 @@ export default function NotificationCentre() {
 
   useEffect(() => {
     bundlesApi.balance().then(({ data }) => setBalance(data)).catch(console.error);
-    notificationsApi.list(id).then(({ data }) => setSends(data)).catch(console.error);
+    notificationsApi.list(id).then(({ data }) => setSends(Array.isArray(data) ? data : [])).catch(console.error);
   }, [id]);
 
   const handlePreview = async () => {
@@ -22,7 +22,7 @@ export default function NotificationCentre() {
       const { data } = await notificationsApi.preview(id, form);
       setPreview(data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Preview failed');
+      setError(err.message);
     }
   };
 
@@ -34,9 +34,9 @@ export default function NotificationCentre() {
       setSuccess(`Notification queued to ${preview.recipientCount} attendees!`);
       setPreview(null);
       setForm({ channel: 'sms', message: '' });
-      notificationsApi.list(id).then(({ data }) => setSends(data)).catch(console.error);
+      notificationsApi.list(id).then(({ data }) => setSends(Array.isArray(data) ? data : [])).catch(console.error);
     } catch (err) {
-      setError(err.response?.data?.error || 'Send failed');
+      setError(err.message);
     } finally {
       setBusy(false);
     }

@@ -10,7 +10,7 @@ export default function MyEvents() {
   const [sharingEventId, setSharingEventId] = useState(null);
 
   useEffect(() => {
-    eventsApi.myEvents().then(({ data }) => setEvents(data)).catch(console.error).finally(() => setLoading(false));
+    eventsApi.myEvents().then(({ data }) => setEvents(Array.isArray(data) ? data : [])).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   return (

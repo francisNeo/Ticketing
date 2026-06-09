@@ -12,7 +12,7 @@ export default function BundleStore() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    bundlesApi.list().then(({ data }) => setBundles(data)).catch(console.error);
+    bundlesApi.list().then(({ data }) => setBundles(Array.isArray(data) ? data : [])).catch(console.error);
     bundlesApi.balance().then(({ data }) => setBalance(data)).catch(console.error);
   }, []);
 
@@ -29,7 +29,7 @@ export default function BundleStore() {
       }
       setSelectedBundle(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Purchase failed');
+      setError(err.message);
     } finally {
       setBusy(false);
     }

@@ -10,7 +10,7 @@ export default function Attendees() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    eventsApi.registrations(id).then(({ data }) => setRegistrations(data)).catch(console.error).finally(() => setLoading(false));
+    eventsApi.registrations(id).then(({ data }) => setRegistrations(Array.isArray(data) ? data : [])).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
   const handleCheckin = async (regId) => {

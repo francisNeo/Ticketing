@@ -38,7 +38,7 @@ function UserModal({ user, roles, onClose, onSaved }) {
       }
       onSaved();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save user');
+      setError(err.message);
     } finally {
       setSaving(false);
     }
@@ -138,9 +138,9 @@ export default function AdminUsers() {
       api.get('/roles'),
     ])
       .then(([usersRes, rolesRes]) => {
-        setUsers(usersRes.data.users);
-        setTotal(usersRes.data.total);
-        setRoles(rolesRes.data);
+        setUsers(Array.isArray(usersRes.data.users) ? usersRes.data.users : []);
+        setTotal(usersRes.data.total || 0);
+        setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
