@@ -67,10 +67,8 @@ export default function EventDetail() {
   const handleRegister = async () => {
     setError('');
     if (!form.name || !form.email || !form.phone) { setError('Please fill in your name, email and phone number'); return; }
-    // Auto-select first ticket type if not already selected
+    // Use selected ticket type or fall back to first available
     const ticketTypeId = form.ticketTypeId || event?.ticketTypes?.[0]?.id;
-    if (!ticketTypeId) { setError('No ticket type available for this event'); return; }
-    if (!form.ticketTypeId) setForm((f) => ({ ...f, ticketTypeId }));
     if (isNamed) {
       const empty = attendeeNames.findIndex((n) => !n.trim());
       if (empty !== -1) { setError(`Please enter the name for attendee ${empty + 1}`); return; }
