@@ -309,8 +309,8 @@ export default function EventDetail() {
                   onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
 
-              {/* Ticket selection — only show if multiple ticket types */}
-              {event.ticketTypes?.length > 1 && (
+              {/* Ticket selection — only show for paid events with multiple ticket types */}
+              {event.ticketTypes?.length > 1 && event.ticketTypes.some((t) => Number(t.price) > 0) && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">Ticket Type</label>
                   {event.ticketTypes.map((t) => (
