@@ -67,7 +67,10 @@ export default function EventDetail() {
   const handleRegister = async () => {
     setError('');
     if (!form.name || !form.email || !form.phone) { setError('Please fill in your name, email and phone number'); return; }
-    if (!form.ticketTypeId && event?.ticketTypes?.length > 1) { setError('Please select a ticket type'); return; }
+    // Auto-select first ticket type if not already selected
+    const ticketTypeId = form.ticketTypeId || event?.ticketTypes?.[0]?.id;
+    if (!ticketTypeId) { setError('No ticket type available for this event'); return; }
+    if (!form.ticketTypeId) setForm((f) => ({ ...f, ticketTypeId }));
     if (isNamed) {
       const empty = attendeeNames.findIndex((n) => !n.trim());
       if (empty !== -1) { setError(`Please enter the name for attendee ${empty + 1}`); return; }
@@ -80,7 +83,7 @@ export default function EventDetail() {
         // Free event — register immediately, skip checkout
         const { data: reg } = await registrationsApi.create({
           eventId: event.id,
-          ticketTypeId: form.ticketTypeId,
+          ticketTypeId,
           quantity: form.quantity,
           attendeeName: form.name,
           attendeeEmail: form.email,
@@ -93,7 +96,7 @@ export default function EventDetail() {
         // Paid event — go to checkout
         navigate(`/e/${slugOrToken}/checkout`, {
           state: {
-            form,
+            form: { ...form, ticketTypeId },
             attendeeNames: isNamed ? attendeeNames : [],
             verifiedToken: tokenData.verifiedToken,
             eventId: event.id,
