@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getErrorMessage } from '../utils/errors';
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -21,7 +21,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('eventhub_refresh');
       if (refreshToken) {
         try {
-          const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
+          const { data } = await axios.post(`${import.meta.env.VITE_API_URL || '/api/v1'}/auth/refresh`, { refreshToken });
           localStorage.setItem('eventhub_token', data.accessToken);
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
