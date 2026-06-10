@@ -67,7 +67,7 @@ export default function EventDetail() {
   const handleRegister = async () => {
     setError('');
     if (!form.name || !form.email || !form.phone) { setError('Please fill in your name, email and phone number'); return; }
-    if (!form.ticketTypeId) { setError('Please select a ticket type'); return; }
+    if (!form.ticketTypeId && event?.ticketTypes?.length > 1) { setError('Please select a ticket type'); return; }
     if (isNamed) {
       const empty = attendeeNames.findIndex((n) => !n.trim());
       if (empty !== -1) { setError(`Please enter the name for attendee ${empty + 1}`); return; }
@@ -331,13 +331,16 @@ export default function EventDetail() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
-                <select className="input text-sm" value={form.quantity}
-                  onChange={(e) => setQty(parseInt(e.target.value))}>
-                  {[1,2,3,4,5,6,7,8,9,10].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
+              {/* Quantity — only show for paid events */}
+              {Number(selectedTicketType?.price) > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                  <select className="input text-sm" value={form.quantity}
+                    onChange={(e) => setQty(parseInt(e.target.value))}>
+                    {[1,2,3,4,5,6,7,8,9,10].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Named-ticket: attendee name fields */}
               {isNamed && (
