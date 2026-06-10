@@ -309,25 +309,27 @@ export default function EventDetail() {
                   onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
 
-              {/* Ticket selection */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">Ticket Type</label>
-                {event.ticketTypes?.map((t) => (
-                  <label key={t.id} className={`flex items-center justify-between p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${form.ticketTypeId === t.id ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <input type="radio" name="ticket" value={t.id} checked={form.ticketTypeId === t.id}
-                        onChange={() => setTicketType(t.id)} className="text-brand-600 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-gray-800">{t.name}</span>
-                        {t.isNamed && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Named</span>}
+              {/* Ticket selection — only show if multiple ticket types */}
+              {event.ticketTypes?.length > 1 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Ticket Type</label>
+                  {event.ticketTypes.map((t) => (
+                    <label key={t.id} className={`flex items-center justify-between p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${form.ticketTypeId === t.id ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <input type="radio" name="ticket" value={t.id} checked={form.ticketTypeId === t.id}
+                          onChange={() => setTicketType(t.id)} className="text-brand-600 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium text-gray-800">{t.name}</span>
+                          {t.isNamed && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Named</span>}
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-sm font-bold text-brand-600 shrink-0 ml-2">
-                      {Number(t.price) === 0 ? 'Free' : `KES ${Number(t.price).toLocaleString()}`}
-                    </span>
-                  </label>
-                ))}
-              </div>
+                      <span className="text-sm font-bold text-brand-600 shrink-0 ml-2">
+                        {Number(t.price) === 0 ? 'Free' : `KES ${Number(t.price).toLocaleString()}`}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
