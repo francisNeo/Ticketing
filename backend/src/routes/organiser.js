@@ -31,7 +31,7 @@ router.get('/plan', ...requireAuth, asyncHandler(async (req, res) => {
 router.get('/events', ...requireAuth, asyncHandler(async (req, res) => {
   const events = await prisma.event.findMany({
     where: { organiserId: req.user.userId },
-    include: { ticketTypes: true, _count: { select: { registrations: true } } },
+    select: { id: true, title: true, slug: true, privateToken: true, visibility: true, status: true, startsAt: true, isFree: true, ticketTypes: true, _count: { select: { registrations: true } } },
     orderBy: { createdAt: 'desc' },
   });
   res.json(events);
