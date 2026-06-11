@@ -28,6 +28,7 @@ export default function EventDetail() {
   const [step, setStep] = useState(searchParams.get('register') === '1' ? 'register' : 'info'); // info | register | bulk
   const [form, setForm] = useState({ name: '', email: '', phone: '', ticketTypeId: '', quantity: 1 });
   const [attendeeNames, setAttendeeNames] = useState(['']); // one entry per ticket slot
+  // Bulk upload state
   const [bulkFile, setBulkFile] = useState(null);
   const [bulkPreview, setBulkPreview] = useState(null); // parsed rows for preview
   const [bulkError, setBulkError] = useState('');
@@ -72,7 +73,6 @@ export default function EventDetail() {
   const handleRegister = async () => {
     setError('');
     if (!form.name || !form.email || !form.phone) { setError('Please fill in your name, email and phone number'); return; }
-    // Use selected ticket type or fall back to first available
     const ticketTypeId = form.ticketTypeId || event?.ticketTypes?.[0]?.id;
     if (isNamed) {
       const empty = attendeeNames.findIndex((n) => !n.trim());
@@ -83,7 +83,6 @@ export default function EventDetail() {
       const { data: tokenData } = await otpApi.autoVerify({ phone: form.phone, eventId: event.id });
 
       if (event.isFree) {
-        // Free event — register immediately, skip checkout
         const { data: reg } = await registrationsApi.create({
           eventId: event.id,
           ticketTypeId,
@@ -96,7 +95,6 @@ export default function EventDetail() {
         });
         navigate(`/tickets/${reg.registration.id}`, { state: { confirmed: true } });
       } else {
-        // Paid event — go to checkout
         navigate(`/e/${slugOrToken}/checkout`, {
           state: {
             form: { ...form, ticketTypeId },
