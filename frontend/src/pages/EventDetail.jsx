@@ -144,8 +144,9 @@ export default function EventDetail() {
     setBulkError('');
     const fd = new FormData();
     fd.append('file', bulkFile);
-    fd.append('registrantEmail', form.email || 'bulk@eventhub.ke');
-    fd.append('registrantPhone', form.phone || '+254000000000');
+    // Only send contact fields when present — backend stores null when absent
+    if (form.email) fd.append('registrantEmail', form.email);
+    if (form.phone) fd.append('registrantPhone', form.phone);
     try {
       const { data } = await registrationsApi.bulkRegister(event.id, fd);
       setBulkResult(data);

@@ -92,6 +92,7 @@ router.post('/bundles', ...requirePermission('bundles:create'), asyncHandler(asy
 }));
 
 router.put('/bundles/:id', ...requirePermission('bundles:edit'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const body = bundleSchema.partial().parse(req.body);
   const bundle = await prisma.notificationBundle.update({ where: { id: req.params.id }, data: body });
   res.json(bundle);
@@ -120,6 +121,7 @@ router.post('/plans', ...requirePermission('bundles:create'), asyncHandler(async
 }));
 
 router.put('/plans/:id', ...requirePermission('bundles:edit'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const body = planSchema.partial().parse(req.body);
   const plan = await prisma.plan.update({ where: { id: req.params.id }, data: body });
   res.json(plan);

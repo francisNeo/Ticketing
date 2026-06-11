@@ -111,6 +111,7 @@ router.post('/events/:eventId/notifications/send', ...requirePermission('events:
 }));
 
 router.get('/events/:eventId/notifications/:sendId', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  if (!await assertEventOwnership(req.params.eventId, req.user.userId, res)) return;
   const send = await prisma.notificationSend.findUnique({ where: { id: req.params.sendId } });
   if (!send) return res.status(404).json({ error: 'Send not found' });
   res.json(send);

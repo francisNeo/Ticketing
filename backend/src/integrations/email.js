@@ -62,7 +62,7 @@ async function sendPasswordResetOtp({ to, otp }) {
   const subject = 'Reset your EventHub password';
   const html = `
     <h2>Password Reset</h2>
-    <p>Your one-time code is: <strong style="font-size:24px">${otp}</strong></p>
+    <p>Your one-time code is: <strong style="font-size:24px">${esc(otp)}</strong></p>
     <p>This code expires in 10 minutes. If you didn't request a reset, ignore this email.</p>
   `;
   return sendEmail({ to, subject, html });

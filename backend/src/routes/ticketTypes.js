@@ -28,6 +28,7 @@ router.post('/events/:eventId/ticket-types', ...requirePermission('events:edit_o
 }));
 
 router.put('/:id', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const body = ticketTypeSchema.partial().parse(req.body);
   // Verify the ticket type belongs to an event owned by this organiser
   const existing = await prisma.ticketType.findFirst({
@@ -42,6 +43,7 @@ router.put('/:id', ...requirePermission('events:edit_own'), asyncHandler(async (
 }));
 
 router.delete('/:id', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   // Verify the ticket type belongs to an event owned by this organiser
   const existing = await prisma.ticketType.findFirst({
     where: { id: req.params.id },
