@@ -14,6 +14,11 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!state?.verifiedToken) { navigate('/'); return; }
+    if (!state?.form?.ticketTypeId) {
+      setError('No ticket type selected. Please go back and select a ticket type.');
+      setStatus('error');
+      return;
+    }
     // Create registration on mount
     setStatus('creating');
     registrationsApi.create({

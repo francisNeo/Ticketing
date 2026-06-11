@@ -78,8 +78,8 @@ router.post('/', asyncHandler(async (req, res) => {
   } else {
     ticketType = await prisma.ticketType.findFirst({ where: { eventId: body.eventId } });
     if (!ticketType) {
-      if (!event.isFree) return res.status(400).json({ error: 'Please select a ticket type' });
-      // Auto-create a default free ticket type for free events
+      if (!event.isFree) return res.status(400).json({ error: 'This event has no ticket types configured. Please contact the organiser.' });
+      // Auto-create a default free ticket type for free events with none configured
       ticketType = await prisma.ticketType.create({
         data: { eventId: body.eventId, name: 'General', price: 0, quantity: null },
       });

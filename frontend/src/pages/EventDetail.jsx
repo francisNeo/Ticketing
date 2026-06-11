@@ -268,7 +268,16 @@ export default function EventDetail() {
                   {t.description && <div className="text-gray-500 text-xs mt-0.5">{t.description}</div>}
                 </div>
               ))}
-              <button onClick={() => setStep('register')} className="btn-primary w-full mt-2">
+              {!event.isFree && (!event.ticketTypes || event.ticketTypes.length === 0) && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+                  Ticket types have not been configured for this event yet. Please contact the organiser.
+                </div>
+              )}
+              <button
+                onClick={() => setStep('register')}
+                disabled={!event.isFree && (!event.ticketTypes || event.ticketTypes.length === 0)}
+                className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Register Now
               </button>
 
