@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { eventsApi } from '../../api/client';
+import { eventsApi, ticketTypesApi } from '../../api/client';
 import { format } from 'date-fns';
 import ShareLink from '../../components/ShareLink';
 
@@ -34,7 +34,7 @@ export default function MyEvents() {
                 <tr key={event.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{event.title}</span>
+                      <Link to={`/e/${event.visibility === 'private' ? event.privateToken : (event.slug || event.id)}`} className="font-medium text-gray-900 hover:text-brand-600 hover:underline">{event.title}</Link>
                       {event.visibility === 'private' && (
                         <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">🔒 Private</span>
                       )}

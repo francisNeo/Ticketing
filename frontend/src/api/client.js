@@ -57,6 +57,7 @@ export const ticketTypesApi = {
   remove: (id) => api.delete(`/ticket-types/${id}`),
 };
 
+
 export const otpApi = {
   autoVerify: (data) => api.post('/otp/auto-verify', data),
   send: (data) => api.post('/otp/send', data),

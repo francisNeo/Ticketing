@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api, { eventsApi } from '../../api/client';
+import api, { eventsApi, ticketTypesApi } from '../../api/client';
 import ShareLink from '../../components/ShareLink';
 
 const CAPTCHA_SITE_KEY = import.meta.env.VITE_CAPTCHA_SITE_KEY || '10000000-ffff-ffff-ffff-000000000001';
@@ -96,10 +96,11 @@ export default function CreateEvent() {
 
       if (!form.isFree) {
         for (const tt of ticketTypes) {
-          await fetch(`/api/v1/ticket-types/events/${event.id}/ticket-types`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('eventhub_token')}` },
-            body: JSON.stringify({ ...tt, price: Number(tt.price), quantity: tt.quantity ? parseInt(tt.quantity) : undefined, isNamed: !!tt.isNamed }),
+          await ticketTypesApi.create(event.id, {
+            ...tt,
+            price: Number(tt.price),
+            quantity: tt.quantity ? parseInt(tt.quantity) : undefined,
+            isNamed: !!tt.isNamed,
           });
         }
       }
