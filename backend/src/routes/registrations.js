@@ -42,7 +42,7 @@ async function confirmFreeRegistration(registration, event, ticketTypeId) {
 
 const createRegSchema = z.object({
   eventId: z.string().uuid(),
-  ticketTypeId: z.string().uuid(),
+  ticketTypeId: z.string().uuid().optional(),
   quantity: z.number().int().min(1).max(10).default(1),
   attendeeName: z.string().min(2).max(255),
   attendeeEmail: z.string().email(),
@@ -70,8 +70,22 @@ router.post('/', asyncHandler(async (req, res) => {
   const event = await prisma.event.findUnique({ where: { id: body.eventId } });
   if (!event || event.status !== 'published') return res.status(404).json({ error: 'Event not found' });
 
-  const ticketType = await prisma.ticketType.findFirst({ where: { id: body.ticketTypeId, eventId: body.eventId } });
-  if (!ticketType) return res.status(404).json({ error: 'Ticket type not found' });
+  // Resolve ticket type — use provided ID, or fall back to first available, or auto-create default for free events
+  let ticketType;
+  if (body.ticketTypeId) {
+    ticketType = await prisma.ticketType.findFirst({ where: { id: body.ticketTypeId, eventId: body.eventId } });
+    if (!ticketType) return res.status(404).json({ error: 'Ticket type not found' });
+  } else {
+    ticketType = await prisma.ticketType.findFirst({ where: { eventId: body.eventId } });
+    if (!ticketType) {
+      if (!event.isFree) return res.status(400).json({ error: 'Please select a ticket type' });
+      // Auto-create a default free ticket type for free events
+      ticketType = await prisma.ticketType.create({
+        data: { eventId: body.eventId, name: 'General', price: 0, quantity: null },
+      });
+    }
+  }
+  body.ticketTypeId = ticketType.id;
 
   // Named-ticket validation
   if (ticketType.isNamed) {
