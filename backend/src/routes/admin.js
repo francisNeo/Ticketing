@@ -3,20 +3,21 @@ const { z } = require('zod');
 const bcrypt = require('bcrypt');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requirePermission } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Users management
 router.get('/users', ...requirePermission('users:view_any'), asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, search } = req.query;
+  const safePage = Math.max(1, +page);
+  const safeLimit = Math.min(Math.max(1, +limit), 100);
   const where = search ? { OR: [{ name: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }] } : {};
   const [users, total] = await Promise.all([
-    prisma.user.findMany({ where, skip: (+page - 1) * +limit, take: +limit, select: { id: true, name: true, email: true, emailVerified: true, createdAt: true, userRoles: { include: { role: true } } } }),
+    prisma.user.findMany({ where, skip: (safePage - 1) * safeLimit, take: safeLimit, select: { id: true, name: true, email: true, emailVerified: true, createdAt: true, userRoles: { include: { role: true } } } }),
     prisma.user.count({ where }),
   ]);
-  res.json({ users, total, page: +page, pages: Math.ceil(total / +limit) });
+  res.json({ users, total, page: safePage, pages: Math.ceil(total / safeLimit) });
 }));
 
 // Admin: create a portal user and assign roles
@@ -51,6 +52,7 @@ router.post('/users', ...requirePermission('users:edit_any'), asyncHandler(async
 
 // Admin: update user roles
 router.put('/users/:id/roles', ...requirePermission('roles:assign'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const { roleNames } = z.object({ roleNames: z.array(z.string()) }).parse(req.body);
   const roles = await prisma.role.findMany({ where: { name: { in: roleNames } } });
 
@@ -69,41 +71,57 @@ router.put('/users/:id/roles', ...requirePermission('roles:assign'), asyncHandle
 }));
 
 // Bundle management
-router.get('/bundles', ...requirePermission('roles:view'), asyncHandler(async (req, res) => {
+const bundleSchema = z.object({
+  name: z.string().min(1).max(100),
+  channel: z.enum(['sms', 'email']),
+  units: z.number().int().positive(),
+  price: z.number().positive(),
+  isActive: z.boolean().optional(),
+  displayOrder: z.number().int().optional(),
+});
+
+router.get('/bundles', ...requirePermission('bundles:view'), asyncHandler(async (req, res) => {
   const bundles = await prisma.notificationBundle.findMany({ orderBy: [{ channel: 'asc' }, { displayOrder: 'asc' }] });
   res.json(bundles);
 }));
 
-router.post('/bundles', ...requirePermission('roles:create'), asyncHandler(async (req, res) => {
-  const body = z.object({
-    name: z.string(),
-    channel: z.enum(['sms', 'email']),
-    units: z.number().int().positive(),
-    price: z.number().positive(),
-    displayOrder: z.number().int().optional(),
-  }).parse(req.body);
+router.post('/bundles', ...requirePermission('bundles:create'), asyncHandler(async (req, res) => {
+  const body = bundleSchema.parse(req.body);
   const bundle = await prisma.notificationBundle.create({ data: body });
   res.status(201).json(bundle);
 }));
 
-router.put('/bundles/:id', ...requirePermission('roles:edit'), asyncHandler(async (req, res) => {
-  const bundle = await prisma.notificationBundle.update({ where: { id: req.params.id }, data: req.body });
+router.put('/bundles/:id', ...requirePermission('bundles:edit'), asyncHandler(async (req, res) => {
+  const body = bundleSchema.partial().parse(req.body);
+  const bundle = await prisma.notificationBundle.update({ where: { id: req.params.id }, data: body });
   res.json(bundle);
 }));
 
 // Plan management
-router.get('/plans', ...requirePermission('roles:view'), asyncHandler(async (req, res) => {
+const planSchema = z.object({
+  name: z.string().min(1).max(100),
+  monthlyPrice: z.number().nonnegative(),
+  annualPrice: z.number().nonnegative().optional(),
+  maxEvents: z.number().int().positive().optional().nullable(),
+  maxAttendeesPerEvent: z.number().int().positive().optional().nullable(),
+  commissionRate: z.number().min(0).max(1).optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get('/plans', ...requirePermission('bundles:view'), asyncHandler(async (req, res) => {
   const plans = await prisma.plan.findMany({ orderBy: { monthlyPrice: 'asc' } });
   res.json(plans);
 }));
 
-router.post('/plans', ...requirePermission('roles:create'), asyncHandler(async (req, res) => {
-  const plan = await prisma.plan.create({ data: req.body });
+router.post('/plans', ...requirePermission('bundles:create'), asyncHandler(async (req, res) => {
+  const body = planSchema.parse(req.body);
+  const plan = await prisma.plan.create({ data: body });
   res.status(201).json(plan);
 }));
 
-router.put('/plans/:id', ...requirePermission('roles:edit'), asyncHandler(async (req, res) => {
-  const plan = await prisma.plan.update({ where: { id: req.params.id }, data: req.body });
+router.put('/plans/:id', ...requirePermission('bundles:edit'), asyncHandler(async (req, res) => {
+  const body = planSchema.partial().parse(req.body);
+  const plan = await prisma.plan.update({ where: { id: req.params.id }, data: body });
   res.json(plan);
 }));
 

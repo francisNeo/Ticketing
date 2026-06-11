@@ -1,15 +1,17 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 
-const prisma = new PrismaClient();
+if (!process.env.JWT_REFRESH_SECRET) {
+  throw new Error('JWT_REFRESH_SECRET env var is required but not set. Set it in your .env file.');
+}
 
 function issueAccessToken(userId, roles) {
   return jwt.sign({ userId, roles }, process.env.JWT_SECRET, { expiresIn: '15m' });
 }
 
 function issueRefreshToken(userId) {
-  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 }
 
 async function register({ name, email, password, role: requestedRole }) {
@@ -70,7 +72,7 @@ async function login({ email, password }) {
 async function refresh(token) {
   let payload;
   try {
-    payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
+    payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
   } catch {
     throw Object.assign(new Error('Invalid refresh token'), { status: 401 });
   }

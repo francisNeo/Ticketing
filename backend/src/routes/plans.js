@@ -1,10 +1,10 @@
 const { Router } = require('express');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requireAuth } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 router.get('/', asyncHandler(async (req, res) => {
   const plans = await prisma.plan.findMany({ where: { isActive: true }, orderBy: { monthlyPrice: 'asc' } });

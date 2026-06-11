@@ -27,6 +27,14 @@ function PrivateRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
+function AdminRoute({ children }) {
+  const { user, loading, isAdmin } = useAuth();
+  if (loading) return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" /></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin()) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -51,11 +59,11 @@ export default function App() {
           <Route path="/dashboard/events/:id/checkin" element={<PrivateRoute><CheckIn /></PrivateRoute>} />
           <Route path="/dashboard/bundles" element={<PrivateRoute><BundleStore /></PrivateRoute>} />
 
-          {/* Admin */}
-          <Route path="/admin/users" element={<PrivateRoute><AdminUsers /></PrivateRoute>} />
-          <Route path="/admin/roles" element={<PrivateRoute><AdminRoles /></PrivateRoute>} />
-          <Route path="/admin/bundles" element={<PrivateRoute><AdminBundles /></PrivateRoute>} />
-          <Route path="/admin/church-config" element={<PrivateRoute><AdminChurchConfig /></PrivateRoute>} />
+          {/* Admin — restricted to users with the admin role */}
+          <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+          <Route path="/admin/roles" element={<AdminRoute><AdminRoles /></AdminRoute>} />
+          <Route path="/admin/bundles" element={<AdminRoute><AdminBundles /></AdminRoute>} />
+          <Route path="/admin/church-config" element={<AdminRoute><AdminChurchConfig /></AdminRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

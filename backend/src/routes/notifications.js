@@ -2,12 +2,11 @@ const { Router } = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requirePermission } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { sendSms } = require('../integrations/sms');
 const { sendEmail } = require('../integrations/email');
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const sendSchema = z.object({
   channel: z.enum(['sms', 'email', 'both']),
@@ -18,6 +17,15 @@ const sendSchema = z.object({
   }).optional(),
 });
 
+async function assertEventOwnership(eventId, userId, res) {
+  const event = await prisma.event.findFirst({ where: { id: eventId, organiserId: userId }, select: { id: true } });
+  if (!event) {
+    res.status(404).json({ error: 'Event not found' });
+    return false;
+  }
+  return true;
+}
+
 async function getAudience(eventId, filter = {}) {
   const where = { eventId, status: { in: ['confirmed', 'checked_in'] } };
   if (filter.ticketTypeId) where.ticketTypeId = filter.ticketTypeId;
@@ -26,6 +34,7 @@ async function getAudience(eventId, filter = {}) {
 }
 
 router.get('/events/:eventId/notifications', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  if (!await assertEventOwnership(req.params.eventId, req.user.userId, res)) return;
   const sends = await prisma.notificationSend.findMany({
     where: { eventId: req.params.eventId, organiserId: req.user.userId },
     orderBy: { createdAt: 'desc' },
@@ -34,6 +43,7 @@ router.get('/events/:eventId/notifications', ...requirePermission('events:edit_o
 }));
 
 router.post('/events/:eventId/notifications/preview', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  if (!await assertEventOwnership(req.params.eventId, req.user.userId, res)) return;
   const body = sendSchema.parse(req.body);
   const audience = await getAudience(req.params.eventId, body.audienceFilter);
   const unitsPerRecipient = body.channel === 'both' ? 2 : 1;
@@ -41,6 +51,7 @@ router.post('/events/:eventId/notifications/preview', ...requirePermission('even
 }));
 
 router.post('/events/:eventId/notifications/send', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  if (!await assertEventOwnership(req.params.eventId, req.user.userId, res)) return;
   const body = sendSchema.parse(req.body);
   const audience = await getAudience(req.params.eventId, body.audienceFilter);
   if (audience.length === 0) return res.status(400).json({ error: 'No recipients found' });

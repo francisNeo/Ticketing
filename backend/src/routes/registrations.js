@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requireAuth, requirePermission } = require('../middlewares/auth');
 const { validateVerifiedToken } = require('../services/otpService');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const QRCode = require('qrcode');
 const XLSX = require('xlsx');
 const multer = require('multer');
@@ -11,7 +11,6 @@ const { sendBookingConfirmation } = require('../integrations/email');
 const { sendSms } = require('../integrations/sms');
 
 const router = Router();
-const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -135,7 +134,7 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // ─── GET /events/:eventId/registration-template — download Excel template ─────
 
-router.get('/events/:eventId/registration-template', asyncHandler(async (req, res) => {
+router.get('/events/:eventId/registration-template', ...requireAuth, asyncHandler(async (req, res) => {
   const event = await prisma.event.findFirst({
     where: { id: req.params.eventId, status: 'published' },
     include: { ticketTypes: true },
@@ -196,7 +195,7 @@ router.get('/events/:eventId/registration-template', asyncHandler(async (req, re
 
 // ─── POST /events/:eventId/bulk-register — upload Excel / CSV ─────────────────
 
-router.post('/events/:eventId/bulk-register', upload.single('file'), asyncHandler(async (req, res) => {
+router.post('/events/:eventId/bulk-register', ...requirePermission('registrations:bulk_create'), upload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const event = await prisma.event.findFirst({
@@ -276,8 +275,9 @@ router.post('/events/:eventId/bulk-register', upload.single('file'), asyncHandle
   // Create registrations
   const created = [];
   const skipped = [];
-  const registrantPhone = req.body.registrantPhone || '+254000000000';
-  const registrantEmail = req.body.registrantEmail || 'bulk@eventhub.ke';
+  // Use null when phone/email are absent — avoid storing fake placeholder PII.
+  const registrantPhone = req.body.registrantPhone || null;
+  const registrantEmail = req.body.registrantEmail || null;
 
   // Group by ticket type for efficiency
   const groups = {};
@@ -303,7 +303,15 @@ router.post('/events/:eventId/bulk-register', upload.single('file'), asyncHandle
             status: event.isFree ? 'confirmed' : 'pending',
           },
         });
-        if (event.isFree) await confirmFreeRegistration(registration, event, ticketType.id);
+        if (event.isFree && (attendee.email || attendee.phone)) {
+          await confirmFreeRegistration(registration, event, ticketType.id);
+        } else if (event.isFree) {
+          // No contact info — still update QR and soldCount but skip notifications
+          const qrUrl = `${process.env.FRONTEND_URL}/tickets/${registration.id}`;
+          const qrCode = await QRCode.toDataURL(qrUrl);
+          await prisma.registration.update({ where: { id: registration.id }, data: { qrCode } });
+          await prisma.ticketType.update({ where: { id: ticketType.id }, data: { soldCount: { increment: 1 } } });
+        }
         created.push({ name: attendee.name, ticketType: ticketType.name, registrationId: registration.id });
       } catch (err) {
         if (err.code === 'P2002') {

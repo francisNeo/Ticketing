@@ -2,10 +2,10 @@ const { Router } = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requirePermission } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const VALID_KINDS = ['service_type', 'denomination', 'dress_code'];
 

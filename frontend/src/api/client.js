@@ -26,7 +26,9 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         } catch {
-          localStorage.clear();
+          localStorage.removeItem('eventhub_token');
+          localStorage.removeItem('eventhub_refresh');
+          localStorage.removeItem('eventhub_user');
           window.location.href = '/login';
         }
       }

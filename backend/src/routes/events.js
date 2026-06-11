@@ -10,10 +10,10 @@ const {
   publishEvent,
   cancelEvent,
 } = require('../services/eventService');
-const { PrismaClient } = require('@prisma/client');
+
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Accepts both full ISO strings and datetime-local format (no timezone)
 const flexDatetime = z.string().transform((val) => new Date(val).toISOString());
@@ -47,7 +47,9 @@ const createEventSchema = z.object({
 // Public — list published events
 router.get('/', asyncHandler(async (req, res) => {
   const { page, limit, category, tags, search } = req.query;
-  const result = await listPublicEvents({ page: +page || 1, limit: +limit || 20, category, tags, search });
+  const safePage = Math.max(1, +page || 1);
+  const safeLimit = Math.min(Math.max(1, +limit || 20), 100);
+  const result = await listPublicEvents({ page: safePage, limit: safeLimit, category, tags, search });
   res.json(result);
 }));
 

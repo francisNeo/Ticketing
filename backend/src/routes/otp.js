@@ -18,8 +18,11 @@ const verifySchema = z.object({
 });
 
 // Default verification — issues a verifiedToken immediately, no SMS required.
-// Used when phone verification is not enforced.
+// ONLY active when OTP_AUTO_VERIFY=true (development/testing only; never enable in production).
 router.post('/auto-verify', asyncHandler(async (req, res) => {
+  if (process.env.OTP_AUTO_VERIFY !== 'true') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   const body = phoneEventSchema.parse(req.body);
   const result = await autoVerify(body.phone, body.eventId);
   res.json(result);

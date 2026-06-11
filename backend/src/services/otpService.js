@@ -1,14 +1,15 @@
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { sendSms } = require('../integrations/sms');
 
-const prisma = new PrismaClient();
 const OTP_EXPIRY = parseInt(process.env.OTP_EXPIRY_SECONDS || '300', 10);
 const MAX_ATTEMPTS = 5;
 
 function generateCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // crypto.randomInt is a CSPRNG — safe for security-sensitive OTP generation
+  return String(100000 + crypto.randomInt(900000));
 }
 
 async function sendOtp(phone, eventId) {

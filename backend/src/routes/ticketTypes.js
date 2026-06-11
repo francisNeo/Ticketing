@@ -2,10 +2,9 @@ const { Router } = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requirePermission } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const ticketTypeSchema = z.object({
   name: z.string().min(1).max(100),
@@ -29,11 +28,27 @@ router.post('/events/:eventId/ticket-types', ...requirePermission('events:edit_o
 
 router.put('/:id', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
   const body = ticketTypeSchema.partial().parse(req.body);
+  // Verify the ticket type belongs to an event owned by this organiser
+  const existing = await prisma.ticketType.findFirst({
+    where: { id: req.params.id },
+    include: { event: { select: { organiserId: true } } },
+  });
+  if (!existing || existing.event.organiserId !== req.user.userId) {
+    return res.status(404).json({ error: 'Ticket type not found' });
+  }
   const ticketType = await prisma.ticketType.update({ where: { id: req.params.id }, data: body });
   res.json(ticketType);
 }));
 
 router.delete('/:id', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  // Verify the ticket type belongs to an event owned by this organiser
+  const existing = await prisma.ticketType.findFirst({
+    where: { id: req.params.id },
+    include: { event: { select: { organiserId: true } } },
+  });
+  if (!existing || existing.event.organiserId !== req.user.userId) {
+    return res.status(404).json({ error: 'Ticket type not found' });
+  }
   await prisma.ticketType.delete({ where: { id: req.params.id } });
   res.json({ deleted: true });
 }));

@@ -2,12 +2,12 @@ const { Router } = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requirePermission, requireAuth } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+
 const { createPaymentIntent, constructWebhookEvent } = require('../integrations/stripe');
 const { initiateStkPush } = require('../integrations/mpesa');
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 router.get('/', asyncHandler(async (req, res) => {
   const bundles = await prisma.notificationBundle.findMany({

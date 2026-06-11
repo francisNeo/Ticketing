@@ -1,22 +1,24 @@
 const { Router } = require('express');
 const { z } = require('zod');
 const { asyncHandler } = require('../middlewares/errorHandler');
-const { requirePermission } = require('../middlewares/auth');
+const { requirePermission, requireAuth } = require('../middlewares/auth');
 const { createPaymentIntent, constructWebhookEvent, createRefund } = require('../integrations/stripe');
 const { initiateStkPush } = require('../integrations/mpesa');
 const { sendBookingConfirmation } = require('../integrations/email');
 const { sendSms } = require('../integrations/sms');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const QRCode = require('qrcode');
 
 const router = Router();
-const prisma = new PrismaClient();
 
 async function confirmRegistration(registrationId) {
   const registration = await prisma.registration.findUnique({
     where: { id: registrationId },
     include: { event: true, ticketType: true },
   });
+
+  // Idempotency guard — duplicate webhooks must not double-increment soldCount
+  if (!registration || registration.status === 'confirmed' || registration.status === 'checked_in') return;
 
   const qrUrl = `${process.env.FRONTEND_URL}/tickets/${registrationId}`;
   const qrCode = await QRCode.toDataURL(qrUrl);
@@ -47,8 +49,8 @@ async function confirmRegistration(registrationId) {
   ).catch(console.error);
 }
 
-// Create Stripe PaymentIntent
-router.post('/stripe/create-intent', asyncHandler(async (req, res) => {
+// Create Stripe PaymentIntent — requires the requesting user to own the registration
+router.post('/stripe/create-intent', ...requireAuth, asyncHandler(async (req, res) => {
   const { registrationId } = z.object({ registrationId: z.string().uuid() }).parse(req.body);
 
   const registration = await prisma.registration.findUnique({
@@ -57,6 +59,11 @@ router.post('/stripe/create-intent', asyncHandler(async (req, res) => {
   });
 
   if (!registration) return res.status(404).json({ error: 'Registration not found' });
+  // Ownership: the attendee email must match the logged-in user's email
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { email: true } });
+  if (!user || registration.attendeeEmail.toLowerCase() !== user.email.toLowerCase()) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (registration.status !== 'pending') return res.status(400).json({ error: 'Registration is not pending payment' });
 
   const amount = Number(registration.ticketType.price) * registration.quantity;

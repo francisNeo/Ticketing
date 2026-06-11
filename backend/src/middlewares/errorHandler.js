@@ -24,7 +24,10 @@ const errorHandler = (err, req, res, next) => {
   }
 
   const status = err.status || err.statusCode || 500;
-  const message = err.message || 'Something went wrong. Please try again.';
+  const isClientError = status >= 400 && status < 500;
+  const message = isClientError
+    ? (err.message || 'Bad request')
+    : (process.env.NODE_ENV === 'production' ? 'Something went wrong. Please try again.' : err.message || 'Internal server error');
   res.status(status).json({ error: message });
 };
 

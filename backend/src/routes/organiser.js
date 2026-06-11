@@ -1,10 +1,10 @@
 const { Router } = require('express');
 const { asyncHandler } = require('../middlewares/errorHandler');
 const { requireAuth } = require('../middlewares/auth');
-const { PrismaClient } = require('@prisma/client');
+
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 router.get('/bundle-balance', ...requireAuth, asyncHandler(async (req, res) => {
   const balance = await prisma.organiserBundleBalance.findUnique({ where: { organiserId: req.user.userId } });
