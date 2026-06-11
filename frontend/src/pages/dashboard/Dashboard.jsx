@@ -65,7 +65,7 @@ export default function Dashboard() {
             {events.slice(0, 5).map((event) => (
               <div key={event.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                 <div>
-                  <div className="font-medium text-gray-900 text-sm">{event.title}</div>
+                  <Link to={`/e/${event.slug || event.id}`} className="font-medium text-gray-900 text-sm hover:text-brand-600 hover:underline">{event.title}</Link>
                   <div className="text-xs text-gray-500 mt-0.5">{format(new Date(event.startsAt), 'MMM d, yyyy')}</div>
                 </div>
                 <div className="flex items-center gap-4">
