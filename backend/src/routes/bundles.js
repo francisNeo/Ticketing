@@ -32,6 +32,7 @@ router.get('/purchases', ...requireAuth, asyncHandler(async (req, res) => {
 }));
 
 router.post('/:id/purchase/stripe', ...requireAuth, asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const bundle = await prisma.notificationBundle.findUnique({ where: { id: req.params.id, isActive: true } });
   if (!bundle) return res.status(404).json({ error: 'Bundle not found' });
 
@@ -56,7 +57,8 @@ router.post('/:id/purchase/stripe', ...requireAuth, asyncHandler(async (req, res
 }));
 
 router.post('/:id/purchase/mpesa', ...requireAuth, asyncHandler(async (req, res) => {
-  const { phone } = z.object({ phone: z.string() }).parse(req.body);
+  z.string().uuid().parse(req.params.id);
+  const { phone } = z.object({ phone: z.string().regex(/^2547\d{8}$/, 'Phone must be in format 2547XXXXXXXX') }).parse(req.body);
   const bundle = await prisma.notificationBundle.findUnique({ where: { id: req.params.id, isActive: true } });
   if (!bundle) return res.status(404).json({ error: 'Bundle not found' });
 

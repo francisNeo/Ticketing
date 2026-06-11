@@ -43,9 +43,9 @@ const createRegSchema = z.object({
   eventId: z.string().uuid(),
   ticketTypeId: z.string().uuid().optional(),
   quantity: z.number().int().min(1).max(10).default(1),
-  attendeeName: z.string().min(2).max(255),
-  attendeeEmail: z.string().email(),
-  attendeePhone: z.string().min(10),
+  attendeeName: z.string().min(2).max(255).trim(),
+  attendeeEmail: z.string().email().max(255).toLowerCase(),
+  attendeePhone: z.string().regex(/^\+?[0-9]{10,15}$/, 'Invalid phone number'),
   verifiedToken: z.string().min(1),
   // Named-ticket attendee names: one per ticket slot, including the primary registrant
   attendeeNames: z.array(z.string().min(2).max(255)).optional(),
@@ -333,6 +333,7 @@ router.post('/events/:eventId/bulk-register', ...requirePermission('registration
 // ─── GET /registrations/:id ────────────────────────────────────────────────────
 
 router.get('/:id', asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const registration = await prisma.registration.findUnique({
     where: { id: req.params.id },
     include: { event: true, ticketType: true, payment: true, answers: { include: { question: true } } },
@@ -344,6 +345,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // ─── POST /registrations/:id/checkin ─────────────────────────────────────────
 
 router.post('/:id/checkin', ...requirePermission('registrations:checkin'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const registration = await prisma.registration.findUnique({ where: { id: req.params.id } });
   if (!registration) return res.status(404).json({ error: 'Registration not found' });
   if (registration.status !== 'confirmed') return res.status(400).json({ error: 'Ticket is not in confirmed state' });

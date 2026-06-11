@@ -31,8 +31,7 @@ router.post('/login', asyncHandler(async (req, res) => {
 }));
 
 router.post('/refresh', asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
+  const { refreshToken } = z.object({ refreshToken: z.string().min(1) }).parse(req.body);
   const result = await refresh(refreshToken);
   res.json(result);
 }));

@@ -16,6 +16,7 @@ const ticketTypeSchema = z.object({
 });
 
 router.post('/events/:eventId/ticket-types', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.eventId);
   const body = ticketTypeSchema.parse(req.body);
   const event = await prisma.event.findFirst({ where: { id: req.params.eventId, organiserId: req.user.userId } });
   if (!event) return res.status(404).json({ error: 'Event not found' });

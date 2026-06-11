@@ -19,28 +19,31 @@ const prisma = require('../lib/prisma');
 const flexDatetime = z.string().transform((val) => new Date(val).toISOString());
 const flexDatetimeOptional = z.string().optional().transform((val) => val ? new Date(val).toISOString() : undefined);
 
+const VALID_RECURRENCE = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
+
 const createEventSchema = z.object({
   title: z.string().min(3).max(255),
-  description: z.string().optional(),
+  description: z.string().max(10000).optional(),
   startsAt: flexDatetime,
   endsAt: flexDatetimeOptional,
   locationType: z.enum(['physical', 'virtual']),
-  locationText: z.string().optional(),
+  locationText: z.string().max(500).optional(),
   visibility: z.enum(['public', 'private']),
   isFree: z.boolean().default(false),
   currency: z.string().length(3).default('KES'),
   maxCapacity: z.number().int().positive().optional(),
   registrationDeadline: flexDatetimeOptional,
-  category: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  minAge: z.number().int().optional(),
-  maxAge: z.number().int().optional(),
+  category: z.string().max(100).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  minAge: z.number().int().min(0).max(120).optional(),
+  maxAge: z.number().int().min(0).max(120).optional(),
+  bannerUrl: z.string().url().max(2048).optional(),
   // Church / Religious fields
-  serviceType: z.string().optional(),
-  ministry: z.string().optional(),
-  denomination: z.string().optional(),
-  dressCode: z.string().optional(),
-  recurrenceRule: z.string().optional(),
+  serviceType: z.string().max(100).optional(),
+  ministry: z.string().max(100).optional(),
+  denomination: z.string().max(100).optional(),
+  dressCode: z.string().max(100).optional(),
+  recurrenceRule: z.enum(VALID_RECURRENCE).optional(),
   captchaToken: z.string().optional(), // retained for future use, not enforced
 });
 
@@ -70,7 +73,9 @@ router.post('/', ...requirePermission('events:create'), asyncHandler(async (req,
 
 // Organiser — update event
 router.put('/:id', ...requirePermission('events:edit_own'), asyncHandler(async (req, res) => {
-  const event = await updateEvent(req.params.id, req.user.userId, req.body);
+  // Re-use createEventSchema (partial) so all field types/lengths are enforced on update too
+  const body = createEventSchema.partial().parse(req.body);
+  const event = await updateEvent(req.params.id, req.user.userId, body);
   res.json(event);
 }));
 
@@ -86,8 +91,18 @@ router.delete('/:id', ...requirePermission('events:delete_own'), asyncHandler(as
   res.json(result);
 }));
 
-// Organiser — list registrations for event
+// Sanitise a CSV cell — wrap in quotes and escape existing quotes.
+// Also strip leading =, +, -, @ to prevent CSV formula injection.
+function csvCell(val) {
+  const s = String(val ?? '').replace(/^[=+\-@]/, "'$&");
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+// Organiser — list registrations for event (own events only)
 router.get('/:id/registrations', ...requirePermission('registrations:view_event'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
+  const event = await prisma.event.findFirst({ where: { id: req.params.id, organiserId: req.user.userId }, select: { id: true } });
+  if (!event) return res.status(404).json({ error: 'Event not found' });
   const registrations = await prisma.registration.findMany({
     where: { eventId: req.params.id },
     include: { ticketType: true, payment: true, answers: true },
@@ -96,8 +111,12 @@ router.get('/:id/registrations', ...requirePermission('registrations:view_event'
   res.json(registrations);
 }));
 
-// Organiser — export CSV
+// Organiser — export CSV (own events only)
 router.get('/:id/export', ...requirePermission('registrations:export'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
+  const event = await prisma.event.findFirst({ where: { id: req.params.id, organiserId: req.user.userId }, select: { id: true } });
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+
   const registrations = await prisma.registration.findMany({
     where: { eventId: req.params.id, status: { in: ['confirmed', 'checked_in'] } },
     include: { ticketType: true, payment: true },
@@ -107,13 +126,13 @@ router.get('/:id/export', ...requirePermission('registrations:export'), asyncHan
     'Name,Email,Phone,Ticket Type,Amount,Status,Checked In',
     ...registrations.map((r) =>
       [
-        `"${r.attendeeName}"`,
-        r.attendeeEmail,
-        r.attendeePhone,
-        `"${r.ticketType.name}"`,
-        r.payment?.amount ?? 0,
-        r.status,
-        r.checkedInAt ? 'Yes' : 'No',
+        csvCell(r.attendeeName),
+        csvCell(r.attendeeEmail),
+        csvCell(r.attendeePhone),
+        csvCell(r.ticketType?.name),
+        csvCell(r.payment?.amount ?? 0),
+        csvCell(r.status),
+        csvCell(r.checkedInAt ? 'Yes' : 'No'),
       ].join(',')
     ),
   ].join('\n');

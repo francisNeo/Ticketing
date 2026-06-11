@@ -203,6 +203,7 @@ router.post('/mpesa/callback', asyncHandler(async (req, res) => {
 
 // Payment status polling
 router.get('/:id/status', asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const payment = await prisma.payment.findFirst({
     where: { registrationId: req.params.id },
     select: { status: true, method: true, paidAt: true },

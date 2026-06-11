@@ -31,7 +31,9 @@ router.get('/', asyncHandler(async (req, res) => {
 // ── Admin: list all (including inactive) ─────────────────────────────────────
 router.get('/all', ...requirePermission('church_config:manage'), asyncHandler(async (req, res) => {
   const { kind } = req.query;
-  const where = kind ? { kind } : {};
+  // Only filter by kind if it is one of the known valid values
+  const safeKind = VALID_KINDS.includes(kind) ? kind : undefined;
+  const where = safeKind ? { kind: safeKind } : {};
   const items = await prisma.churchEventConfig.findMany({
     where,
     orderBy: [{ kind: 'asc' }, { displayOrder: 'asc' }, { value: 'asc' }],
@@ -61,6 +63,7 @@ router.post('/', ...requirePermission('church_config:manage'), asyncHandler(asyn
 
 // ── Admin: update (rename or reorder) ────────────────────────────────────────
 router.put('/:id', ...requirePermission('church_config:manage'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const body = z.object({
     value: z.string().min(1).max(255).trim().optional(),
     displayOrder: z.number().int().optional(),
@@ -76,6 +79,7 @@ router.put('/:id', ...requirePermission('church_config:manage'), asyncHandler(as
 
 // ── Admin: delete permanently ─────────────────────────────────────────────────
 router.delete('/:id', ...requirePermission('church_config:manage'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   await prisma.churchEventConfig.delete({ where: { id: req.params.id } });
   res.json({ ok: true });
 }));

@@ -15,6 +15,7 @@ router.get('/', ...requirePermission('roles:view'), asyncHandler(async (req, res
 }));
 
 router.get('/:id', ...requirePermission('roles:view'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const role = await prisma.role.findUnique({
     where: { id: req.params.id },
     include: { permissions: { include: { permission: true } } },
@@ -51,6 +52,7 @@ router.post('/', ...requirePermission('roles:create'), asyncHandler(async (req, 
 }));
 
 router.put('/:id', ...requirePermission('roles:edit'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const role = await prisma.role.findUnique({ where: { id: req.params.id } });
   if (!role) return res.status(404).json({ error: 'Role not found' });
 
@@ -80,6 +82,7 @@ router.put('/:id', ...requirePermission('roles:edit'), asyncHandler(async (req, 
 }));
 
 router.delete('/:id', ...requirePermission('roles:delete'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.id);
   const role = await prisma.role.findUnique({ where: { id: req.params.id } });
   if (!role) return res.status(404).json({ error: 'Role not found' });
   if (role.isSystem) return res.status(403).json({ error: 'System roles cannot be deleted' });
@@ -100,6 +103,7 @@ router.get('/permissions', ...requirePermission('roles:view'), asyncHandler(asyn
 
 // User role management
 router.get('/users/:userId/roles', ...requirePermission('roles:view'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.userId);
   const userRoles = await prisma.userRole.findMany({
     where: { userId: req.params.userId },
     include: { role: true },
@@ -108,6 +112,7 @@ router.get('/users/:userId/roles', ...requirePermission('roles:view'), asyncHand
 }));
 
 router.post('/users/:userId/roles', ...requirePermission('roles:assign'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.userId);
   const { roleId, expiresAt } = z.object({ roleId: z.string().uuid(), expiresAt: z.string().datetime().optional() }).parse(req.body);
   const userRole = await prisma.userRole.create({
     data: { userId: req.params.userId, roleId, assignedBy: req.user.userId, expiresAt: expiresAt ? new Date(expiresAt) : null },
@@ -116,6 +121,8 @@ router.post('/users/:userId/roles', ...requirePermission('roles:assign'), asyncH
 }));
 
 router.delete('/users/:userId/roles/:roleId', ...requirePermission('roles:assign'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.userId);
+  z.string().uuid().parse(req.params.roleId);
   await prisma.userRole.delete({ where: { userId_roleId: { userId: req.params.userId, roleId: req.params.roleId } } });
   res.json({ removed: true });
 }));
