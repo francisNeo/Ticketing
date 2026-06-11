@@ -51,6 +51,12 @@ export const eventsApi = {
   myEvents: () => api.get('/organiser/events'),
 };
 
+export const ticketTypesApi = {
+  create: (eventId, data) => api.post(`/ticket-types/events/${eventId}/ticket-types`, data),
+  update: (id, data) => api.put(`/ticket-types/${id}`, data),
+  remove: (id) => api.delete(`/ticket-types/${id}`),
+};
+
 export const otpApi = {
   autoVerify: (data) => api.post('/otp/auto-verify', data),
   send: (data) => api.post('/otp/send', data),
