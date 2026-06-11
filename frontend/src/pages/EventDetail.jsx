@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { eventsApi, otpApi, registrationsApi } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import ShareLink from '../components/ShareLink';
 
 const RECURRENCE_LABELS = {
@@ -20,6 +21,7 @@ export default function EventDetail() {
   const { slugOrToken } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user, isAdmin } = useAuth();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   // ?register=1 in URL jumps straight to the registration form
@@ -44,6 +46,9 @@ export default function EventDetail() {
 
   const selectedTicketType = event?.ticketTypes?.find((t) => t.id === form.ticketTypeId);
   const isNamed = !!selectedTicketType?.isNamed;
+
+  // Bulk upload is restricted to: platform admins or the event's own organiser
+  const canBulkUpload = isAdmin() || (user && event && event.organiser?.id === user.id);
 
   // Keep attendeeNames array in sync with quantity
   const syncNames = (qty) => {
@@ -359,7 +364,7 @@ export default function EventDetail() {
                     <label className="text-xs font-medium text-amber-700">
                       Attendee Names <span className="text-red-500">*</span>
                     </label>
-                    {form.quantity > 3 && (
+                    {form.quantity > 3 && canBulkUpload && (
                       <button
                         type="button"
                         onClick={() => setStep('bulk')}
@@ -404,14 +409,16 @@ export default function EventDetail() {
                 {busy ? 'Please wait...' : event.isFree ? 'Confirm Registration' : 'Proceed to Payment'}
               </button>
 
-              {/* Bulk upload link */}
-              <button
-                type="button"
-                onClick={() => setStep('bulk')}
-                className="text-xs text-gray-500 w-full text-center hover:underline"
-              >
-                Registering a group? Upload Excel file →
-              </button>
+              {/* Bulk upload link — only visible to admins and the event organiser */}
+              {canBulkUpload && (
+                <button
+                  type="button"
+                  onClick={() => setStep('bulk')}
+                  className="text-xs text-gray-500 w-full text-center hover:underline"
+                >
+                  Registering a group? Upload Excel file →
+                </button>
+              )}
               <button onClick={() => setStep('info')} className="text-xs text-gray-400 w-full text-center hover:underline">Back</button>
             </div>
           )}

@@ -134,9 +134,17 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // ─── GET /events/:eventId/registration-template — download Excel template ─────
 
-router.get('/events/:eventId/registration-template', ...requireAuth, asyncHandler(async (req, res) => {
+router.get('/events/:eventId/registration-template', ...requirePermission('registrations:bulk_create'), asyncHandler(async (req, res) => {
+  z.string().uuid().parse(req.params.eventId);
+
+  const isAdmin = req.userRoleNames?.includes('admin');
+
   const event = await prisma.event.findFirst({
-    where: { id: req.params.eventId, status: 'published' },
+    where: {
+      id: req.params.eventId,
+      status: 'published',
+      ...(isAdmin ? {} : { organiserId: req.user.userId }),
+    },
     include: { ticketTypes: true },
   });
   if (!event) return res.status(404).json({ error: 'Event not found' });
@@ -198,8 +206,17 @@ router.get('/events/:eventId/registration-template', ...requireAuth, asyncHandle
 router.post('/events/:eventId/bulk-register', ...requirePermission('registrations:bulk_create'), upload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
+  z.string().uuid().parse(req.params.eventId);
+
+  const isAdmin = req.userRoleNames?.includes('admin');
+
   const event = await prisma.event.findFirst({
-    where: { id: req.params.eventId, status: 'published' },
+    where: {
+      id: req.params.eventId,
+      status: 'published',
+      // Non-admins may only bulk-register for their own events
+      ...(isAdmin ? {} : { organiserId: req.user.userId }),
+    },
     include: { ticketTypes: true },
   });
   if (!event) return res.status(404).json({ error: 'Event not found' });
